@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     smtp_port: int = 1025
     mail_from: str = "router@example.com"
     agent_timeout_s: float = 60.0
+    agent_retries: int = 3
+    smtp_timeout_s: float = 10.0
     health_timeout_s: float = 2.0
 
 
