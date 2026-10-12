@@ -3,8 +3,12 @@ from types import TracebackType
 from typing import Self
 
 import pytest
+from pydantic_ai import models
 
 from app.mail import sender
+
+# Unit tests run without Ollama: any request to a real model fails instead of hitting the network.
+models.ALLOW_MODEL_REQUESTS = False
 
 
 class FakeSMTP:
