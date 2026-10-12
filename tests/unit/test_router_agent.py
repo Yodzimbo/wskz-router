@@ -180,13 +180,13 @@ async def test_user_message_only_in_user_prompt(
 async def test_fallback_is_logged(
     agent: RouterAgent, fake_smtp: type[FakeSMTP], caplog: pytest.LogCaptureFixture
 ) -> None:
-    secret = "Mój numer PESEL to 12345678901"
+    message = "Gdzie mogę zostawić rower?"
 
     with caplog.at_level(logging.INFO, logger="app.agent.router_agent"):
-        await route(agent, scripted(call(Department.OTHER)), message=secret)
+        await route(agent, scripted(call(Department.OTHER)), message=message)
 
     assert "recipient=other@example.com fallback=True" in caplog.text
-    assert secret not in caplog.text
+    assert message not in caplog.text
 
 
 async def test_two_calls_in_one_response_send_one_email(
