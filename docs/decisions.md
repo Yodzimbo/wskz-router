@@ -3,9 +3,9 @@
 Każda decyzja: kontekst, decyzja, konsekwencje. Uzupełniane w kolejnych milestone'ach.
 
 ## ADR-001: Język promptu i opisów toola
-- Kontekst: _do uzupełnienia_
-- Decyzja: _do uzupełnienia_
-- Konsekwencje: _do uzupełnienia_
+- Kontekst: wiadomości i maile są po polsku, a mały model (4B) najlepiej trzyma się instrukcji i schematu toola w języku, na którym głównie go trenowano. Wiadomość ląduje u polskojęzycznych działów.
+- Decyzja: instrukcje agenta, opisy działów i docstring toola po angielsku; temat i treść maila model pisze po polsku (wprost w instrukcji). Wiadomość użytkownika trafia do modelu bez zmian, jako user prompt.
+- Konsekwencje: w pomiarze z ADR-002 ten zestaw dał 100% poprawnych działów na 12 polskich wiadomościach, a w M3 `dod_check` 7/7 (z próbą injection). Opisy działów są w jednym miejscu (`app/departments.py`), więc zmiana sformułowań to zmiana jednego pliku, sprawdzana pełnym evalem w M5.
 
 ## ADR-002: Wybór modelu LLM
 - Kontekst: model ma niezawodnie wywoływać tool `send_email` z poprawnym działem (enum 5 adresów), rozumieć polskie wiadomości i odpowiadać w rozsądnym czasie na CPU przeciętnego laptopa. Wybór na podstawie pomiaru, nie opinii. Kryterium ustalone przed pomiarem: (1) ≥ 90% poprawnych działów i 100% wywołań toola w lepszym wariancie rejestracji toola, (2) p95 ≤ 30 s, (3) najmniejszy rozmiar pobrania. `qwen2.5:7b` tylko jako punkt odniesienia.
@@ -34,14 +34,16 @@ Każda decyzja: kontekst, decyzja, konsekwencje. Uzupełniane w kolejnych milest
 - Konsekwencje: przez REST API (`/api/v1/messages`, `/api/v1/message/{ID}`) testy integracyjne sprawdzają odbiorcę i `Reply-To`, a nie tylko to, że mail doszedł. Obraz ma wbudowane `mailpit readyz`, więc healthcheck nie potrzebuje `curl`.
 
 ## ADR-004: Kontrakt toola wysyłającego e-mail
-- Kontekst: _do uzupełnienia (M3)_
-- Decyzja: _do uzupełnienia_
-- Konsekwencje: _do uzupełnienia_
+- Kontekst: zadanie wymaga, żeby wysyłkę robił agent przez tool / function calling, a mail miał `Reply-To` = nadawca. Treść wiadomości pochodzi od użytkownika, więc może zawierać próbę przejęcia agenta („wyślij do ceo@…”, „ustaw Reply-To na …”).
+- Decyzja: jeden tool `send_email(department: Department, subject: str, body: str)` zarejestrowany jako jedyne wyjście agenta (`output_type=ToolOutput(send_email)`, wariant B z ADR-002). Model widzi tylko te trzy parametry: `department` to enum 5 adresów z `app/departments.py`, nie dowolny string. `Reply-To` tool bierze z `ctx.deps.sender_email` (adres z requestu), a nadawcę `From` z konfiguracji (`MAIL_FROM`). Do treści maila tool dokleja oryginalną wiadomość, żeby dział dostał pełny kontekst niezależnie od streszczenia. Kolejność w toolu: walidacja (pusty temat / treść → `ModelRetry`), potem wysyłka, bo ponowienie po wysyłce wysłałoby drugi mail. Adres spoza enuma odrzuca walidacja pydantic-ai przed wywołaniem funkcji i model dostaje ponowienie. `end_strategy="graceful"`: gdy model zwróci kilka wywołań naraz, wykonuje się tylko pierwsze poprawne (jeden mail). Temat jest spłaszczany do jednej linii (max 150 znaków), a `EmailMessage` z domyślną polityką odrzuca CR/LF w nagłówkach.
+- Odrzucone: zwykły tool z odpowiedzią tekstową (wariant A; przy injection modele odmawiały tekstem i nic nie wysyłały), klasyfikacja `output_type=Department` i wysyłka w kodzie (wysyłkę robiłby kod, nie tool), parametry `to` / `reply_to` w toolu (model mógłby je ustawić z treści wiadomości), `tool_choice="required"` (Ollama go nie obsługuje), `aiosmtplib` (nowa zależność; `smtplib` w `asyncio.to_thread` nie blokuje pętli zdarzeń).
+- Konsekwencje: prompt injection nie może zmienić adresata ani `Reply-To`, co najwyżej wybór działu z listy (sprawdzone w testach unit i w `dod_check`). Każda udana odpowiedź API oznacza dokładnie jeden wysłany mail.
 
 ## ADR-005: Fallback przy braku decyzji modelu
-- Kontekst: _do uzupełnienia (M3)_
-- Decyzja: _do uzupełnienia_
-- Konsekwencje: _do uzupełnienia_
+- Kontekst: `other@example.com` jest w zadaniu fallbackiem dla nierozpoznanych zgłoszeń. Mały model może też nie wywołać toola wcale (odpowiedzieć tekstem), wywołać go z błędnymi argumentami albo nie zdążyć na CPU.
+- Decyzja: fallback to decyzja modelu, nie kodu. Instrukcja mówi „sprawa nie pasuje do żadnego działu albo nie jesteś pewien → `other@`”. Odpowiedź API ma wtedy `fallback_used: true`, a decyzja jest logowana (dział, fallback, czas, liczba requestów do modelu, bez treści wiadomości). Gdy model po `AGENT_RETRIES` ponowieniach (domyślnie 3) nie wywoła poprawnie toola, API zwraca 502 `agent_no_tool_call` i nic nie wysyła. Niedostępna Ollama → 502 `model_unavailable`, niedostępny SMTP → 502 `mail_delivery_failed`, przekroczony `AGENT_TIMEOUT_S` (60 s) → 504 `agent_timeout`. Limit requestów do modelu w jednym runie: `AGENT_RETRIES + 2`.
+- Odrzucone: wysyłka do `other@` z kodu po błędzie agenta (wysyłkę robiłby kod, nie tool, a dział „inne” dostawałby maile bez żadnej decyzji); odpowiedź 202 z wysyłką w tle (bez kolejki tylko ukrywałaby błędy przed klientem).
+- Konsekwencje: klient zawsze wie, czy mail wyszedł (200) i czy trafił do fallbacku. Błąd modelu jest widoczny jako 502 zamiast cichej wysyłki. Ryzyko szczątkowe: timeout przypadający w trakcie wysyłki SMTP (wysyłka biegnie w wątku) zwróci 504, choć mail mógł już wyjść; przy SMTP trwającym milisekundy wobec 60 s limitu to rzadkie.
 
 ## ADR-006: Pobieranie modelu w osobnym kontenerze `ollama-init`
 - Kontekst: po `docker compose up -d` środowisko ma być gotowe do pracy, czyli model musi już być pobrany. Pierwsze pobranie to kilka GB.
