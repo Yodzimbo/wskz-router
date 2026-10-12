@@ -1,0 +1,22 @@
+# Only requirements.txt and app/ are copied into the image.
+.git
+.gitignore
+.gitattributes
+.venv
+.claude
+CLAUDE.md
+.env
+.env.*
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+tests
+eval
+docs
+*.md
+LICENSE
+docker-compose.yml
+Dockerfile
+.dockerignore

@@ -1,0 +1,77 @@
+name: wskz-router
+
+# One `docker compose up -d` starts everything. The first run pulls the Ollama image
+# and model weights (several GB); later runs reuse the `ollama-models` volume.
+# `docker compose down -v` deletes that volume, so the next start downloads the model again.
+
+services:
+  ollama:
+    image: ollama/ollama:0.40.2
+    restart: unless-stopped
+    volumes:
+      - ollama-models:/root/.ollama
+    # No host port: a local Ollama on 11434 would clash. Debug: docker compose exec ollama ollama list
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  # One-shot: pulls the model into the shared volume, skips the download when it is already there.
+  ollama-init:
+    image: ollama/ollama:0.40.2
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
+    entrypoint: ["/bin/sh", "-c"]
+    command: ['ollama show "$$OLLAMA_MODEL" > /dev/null 2>&1 || ollama pull "$$OLLAMA_MODEL"']
+
+  mailpit:
+    image: axllent/mailpit:v1.31.5
+    restart: unless-stopped
+    ports:
+      - "8025:8025" # web UI + REST API
+      - "127.0.0.1:1025:1025" # SMTP, for manual tests from the host
+    # Declared here because the image's own healthcheck uses start-interval (Docker Engine 25+).
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      MAIL_FROM: ${MAIL_FROM:-router@example.com}
+      AGENT_TIMEOUT_S: ${AGENT_TIMEOUT_S:-60}
+    depends_on:
+      ollama-init:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  ollama-models:
