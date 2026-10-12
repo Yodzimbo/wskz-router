@@ -17,6 +17,8 @@ Pierwszy start pobiera ok. 6,5 GB: obraz Ollamy oraz wagi modelu `qwen3:4b-instr
 
 Kolejne starty trwają ok. 10–15 s do gotowości API, bo model zostaje w wolumenie `ollama-models` i nie jest pobierany ponownie. `docker compose down` zatrzymuje środowisko. `docker compose down -v` dodatkowo kasuje wolumen z wagami, więc następny start znów pobierze model.
 
+Domyślnie wszystko działa na CPU. Opcjonalny GPU (NVIDIA) opisuje sekcja [GPU](#gpu-opcjonalnie).
+
 | Usługa | Adres |
 |---|---|
 | Swagger (dokumentacja API) | http://localhost:8000/api/v1/docs |
@@ -25,8 +27,6 @@ Kolejne starty trwają ok. 10–15 s do gotowości API, bo model zostaje w wolum
 | Mailpit, panel z przechwyconymi mailami | http://localhost:8025 |
 
 Strona Swaggera ładuje swoje skrypty z CDN, więc przeglądarka potrzebuje dostępu do internetu. Sam `openapi.json` działa offline.
-
-Konfiguracja jest opcjonalna. Domyślne wartości są w `docker-compose.yml`, a do nadpisania służy `cp .env.example .env`, np. przy zmianie modelu (`OLLAMA_MODEL`).
 
 ## Przykładowe zapytanie (cURL)
 Po `docker compose up -d` (API zgłasza `healthy`):
@@ -49,8 +49,52 @@ Mail jest widoczny w Mailpicie: http://localhost:8025 (adresat `help-desk@exampl
 |---|---|
 | 200 | agent wysłał maila; `recipient` = dział, `fallback_used: true`, gdy wybrał `other@example.com` |
 | 422 | błędny `email`, pusta (albo sama spacja) lub dłuższa niż 5000 znaków `message`; nic nie jest wysyłane |
-| 502 | nic nie wysłano: model nie wywołał toola mimo ponowień (`agent_no_tool_call`), Ollama niedostępna (`model_unavailable`), serwer SMTP niedostępny (`mail_delivery_failed`) |
+| 502 | nic nie wysłano: model nie wywołał toola mimo ponowień (`agent_no_tool_call`) albo serwer SMTP niedostępny (`mail_delivery_failed`) |
+| 503 | nic nie wysłano: Ollama niedostępna albo zwróciła błąd (`model_unavailable`); można ponowić później |
 | 504 | agent nie skończył w `AGENT_TIMEOUT_S` (domyślnie 60 s, `agent_timeout`) |
+
+Błędy 502 / 503 / 504 mają body `{"error": "<kod>", "detail": "..."}`. Każda odpowiedź ma nagłówek `X-Request-ID` (opis w sekcji [Obserwowalność](#obserwowalność)).
+
+## Konfiguracja
+Konfiguracja jest opcjonalna. Domyślne wartości są w `docker-compose.yml`, a do nadpisania służy `cp .env.example .env`, np. przy zmianie modelu (`OLLAMA_MODEL`).
+
+| Zmienna | Domyślnie | Znaczenie |
+|---|---|---|
+| `OLLAMA_MODEL` | `qwen3:4b-instruct` | model pobierany przez `ollama-init` i używany przez agenta |
+| `MAIL_FROM` | `router@example.com` | nadawca (`From`) wysyłanych maili |
+| `AGENT_TIMEOUT_S` | `60` | limit całego runu agenta (wszystkie requesty do modelu i wysyłka), potem 504 |
+| `AGENT_RETRIES` | `3` | ponowienia, gdy model odpowie tekstem albo poda błędne argumenty toola |
+
+Pozostałe limity czasu to ustawienia z domyślną wartością w `app/config.py` (`SMTP_TIMEOUT_S`, `HEALTH_TIMEOUT_S`); compose ich nie przekazuje. Łańcuch timeoutów jest ułożony tak, żeby krótszy limit zawsze zadziałał przed dłuższym i klient dostał konkretny błąd, a nie zerwane połączenie:
+
+| Limit | Wartość | Skutek |
+|---|---|---|
+| połączenie z Ollamą (klient pydantic-ai) | 5 s, 2 ponowienia z backoffem | zatrzymana Ollama → szybkie 503 `model_unavailable`, bez czekania na `AGENT_TIMEOUT_S` (host, który nie odpowiada wcale, to do ok. 3 × 5 s) |
+| `SMTP_TIMEOUT_S` | 10 s | 502 `mail_delivery_failed` |
+| `AGENT_TIMEOUT_S` | 60 s (ponad 2 × p95 z ADR-002) | 504 `agent_timeout` |
+| `HEALTH_TIMEOUT_S` | 2 s na każdą zależność | `/health` 503 zamiast wiszenia |
+| healthcheck `api` w compose | 4 s (request) / 5 s (Docker) | dłuższy niż `/health`, więc nie ucina jego odpowiedzi |
+
+### GPU (opcjonalnie)
+Domyślny `docker compose up -d` używa CPU i działa na każdym laptopie. Z kartą NVIDIA można przyspieszyć inferencję plikiem nakładkowym `docker-compose.gpu.yml` (rezerwuje wszystkie GPU dla kontenera `ollama`):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d    # albo: make up-gpu
+```
+
+Wymaga sterownika NVIDIA i [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) na hoście (w Docker Desktop na Windows: backend WSL2). Bez toolkitu kontener `ollama` nie wystartuje (błąd sterownika urządzenia); wtedy wystarczy zwykły `docker compose up -d`. Wariant GPU nie był testowany na maszynie deweloperskiej (brak toolkitu); AMD / ROCm nie jest obsługiwany.
+
+### Makefile
+`make` to tylko skrót: każdy cel uruchamia jedną komendę opisaną w tym README, więc bez `make` (np. na Windows) wystarczy wpisać ją ręcznie. `make` bez argumentów wypisuje cele:
+
+| Cel | Komenda |
+|---|---|
+| `make up` / `make up-gpu` / `make down` | `docker compose up -d` / z `docker-compose.gpu.yml` / `docker compose down` |
+| `make logs` / `make ps` | `docker compose logs -f api` / `docker compose ps` |
+| `make test` / `make test-int` | testy unit / integracyjne (sekcja [Testy](#testy-i-ewaluacja)) |
+| `make eval` | `.venv/bin/python eval/run_eval.py` |
+| `make lint` / `make fmt` | ruff check + format check + mypy / formatowanie ruff |
+| `make clean-check CONFIRM=yes` | zimny start: `docker compose down -v` i `up -d`; kasuje pobrany model, bez `CONFIRM=yes` kończy się błędem i nic nie usuwa |
 
 ## Architektura
 ```
@@ -75,11 +119,28 @@ Lista działów i ich opisy są zdefiniowane raz, w `app/departments.py`: instru
 
 | Plik | Rola |
 |---|---|
-| `app/api/messages.py` | endpoint, mapowanie błędów na 502 / 504 |
+| `app/main.py` | aplikacja FastAPI, middleware `X-Request-ID` |
+| `app/api/messages.py` | endpoint, mapowanie błędów na 502 / 503 / 504, linia logu decyzji |
+| `app/logging.py` | formatter logów JSON |
 | `app/agent/router_agent.py` | agent, instrukcje, limit ponowień i timeout |
 | `app/agent/tools.py` | tool `send_email`: jedyne miejsce, które zleca wysyłkę |
 | `app/mail/sender.py` | `EmailMessage` + SMTP (jedyny kod SMTP) |
 | `app/departments.py` | enum 5 adresów + opisy działów |
+
+## Obserwowalność
+Każdy request, który przeszedł walidację, zostawia w logach API dokładnie jedną linię JSON z decyzją, także przy błędzie (wtedy `outcome` to kod błędu, a pola decyzji są `null`):
+
+```bash
+docker compose logs api | grep '"logger": "app.api.messages"'   # albo: grep <X-Request-ID>
+```
+
+```json
+{"ts": "2026-10-12T10:15:02.481+00:00", "level": "INFO", "logger": "app.api.messages", "msg": "routed", "request_id": "3f2a9c0e8b7d4e1fa6c5b4d3e2f1a0b9", "outcome": "sent", "status": 200, "recipient": "help-desk@example.com", "fallback_used": false, "model_requests": 1, "duration_ms": 5321, "smtp_ms": 4, "message_length": 22, "sender_domain": "example.com"}
+```
+
+Log nigdy nie zawiera treści wiadomości ani pełnego adresu nadawcy, tylko długość wiadomości i domenę. `model_requests` > 1 oznacza, że model potrzebował przypomnienia (ponowienia), a `fallback_used: true` to wybór `other@example.com`.
+
+`X-Request-ID` łączy odpowiedź API, linię logu i maila: middleware nadaje identyfikator (albo przyjmuje go od klienta, jeśli ma do 64 znaków `A-Z a-z 0-9 . _ -`), zwraca go w nagłówku odpowiedzi, a tool `send_email` dodaje ten sam nagłówek do maila (widoczny w Mailpicie w zakładce nagłówków). Model go nie widzi. Logi samego uvicorna (access log) zostają w formacie tekstowym.
 
 ## Decyzje projektowe
 Skrót poniżej, szczegóły w [docs/decisions.md](docs/decisions.md).
@@ -89,7 +150,8 @@ Skrót poniżej, szczegóły w [docs/decisions.md](docs/decisions.md).
 - **Model pobiera osobny kontener `ollama-init`.** API startuje dopiero po jego sukcesie, a ponowny start nie pobiera modelu drugi raz (ADR-006).
 - **Wysyłkę robi tool agenta, a tool jest jedynym wyjściem agenta.** Model nie może zakończyć pracy odpowiedzią tekstową: dostaje przypomnienie i ponawia (domyślnie 3 razy, `AGENT_RETRIES`). Kod po agencie niczego nie wysyła (ADR-004).
 - **Model wybiera tylko dział (enum), temat i treść.** Adres działu pochodzi z enuma, a `Reply-To` z requestu, więc prośba w wiadomości „wyślij do ceo@…, ustaw Reply-To na …” nie ma czym zadziałać (ADR-004).
-- **Fallback `other@example.com` to decyzja modelu, oznaczona `fallback_used: true` i zalogowana.** Gdy model w ogóle nie wywoła toola, API zwraca 502 i nic nie wysyła, zamiast wysyłać „na ślepo” (ADR-005).
+- **Fallback `other@example.com` to decyzja modelu, oznaczona `fallback_used: true` i zalogowana.** Gdy model w ogóle nie wywoła toola, API zwraca 502 i nic nie wysyła, zamiast wysyłać „na ślepo”. Niedostępna Ollama daje szybkie 503 (ADR-005).
+- **Jedna linia logu JSON na request i `X-Request-ID` od odpowiedzi do maila**, bez nowych zależności (ADR-007).
 - **Instrukcje po angielsku, temat i treść maila po polsku** (ADR-001).
 
 _Pozostałe decyzje: do uzupełnienia._
@@ -104,12 +166,13 @@ python3.12 -m venv .venv
 .venv/bin/pytest tests/integration -m integration -q     # ok. 1 min, wymaga docker compose up -d
 ```
 
-**Testy jednostkowe** (`tests/unit`, 60 testów) nie potrzebują Ollamy ani sieci: model zastępuje `FunctionModel` z pydantic-ai, który zwraca zaplanowane wywołania toola, a SMTP jest podmieniony. Prawdziwe zapytanie do modelu kończy się błędem (`ALLOW_MODEL_REQUESTS = False`). Sprawdzają kontrakt agenta:
+**Testy jednostkowe** (`tests/unit`, 71 testów) nie potrzebują Ollamy ani sieci: model zastępuje `FunctionModel` z pydantic-ai, który zwraca zaplanowane wywołania toola, a SMTP jest podmieniony. Prawdziwe zapytanie do modelu kończy się błędem (`ALLOW_MODEL_REQUESTS = False`). Sprawdzają kontrakt agenta:
 - mail wysyła wyłącznie tool `send_email` (sprawdzane też statycznie: `smtplib` tylko w `app/mail/`, funkcja wysyłająca importowana tylko przez tool), a gdy model odpowie tekstem zamiast toola, nic nie zostaje wysłane i API zwraca 502;
 - model widzi w toolu tylko dział (enum 5 adresów), temat i treść. Adres spoza listy albo dodatkowy argument `reply_to` jest odrzucany z prośbą o poprawkę, a `Reply-To` zawsze pochodzi z requestu;
 - treść wiadomości trafia do modelu tylko jako wiadomość użytkownika, nigdy do instrukcji systemowych;
 - lista działów w kodzie, prompcie i tabeli w tym README jest ta sama, fallback `other@` jest oznaczony w odpowiedzi i zalogowany;
-- walidacja requestu (422), mapowanie błędów (502, 504), timeout, `/health`, sanityzacja tematu maila.
+- walidacja requestu (422), mapowanie błędów (502, 503, 504), timeout, `/health`, sanityzacja tematu maila;
+- linia logu decyzji (pola, brak treści wiadomości i lokalnej części adresu, `fallback_used`) oraz `X-Request-ID` w odpowiedzi, logu i mailu (także odrzucenie niebezpiecznego identyfikatora od klienta).
 
 **Testy integracyjne** (`tests/integration`, 6 testów) wysyłają requesty do działającego API i sprawdzają maile przez API Mailpit: dokładnie jeden mail na request, adresat zgodny z odpowiedzią API i z listy działów, nagłówek `Reply-To` równy nadawcy, niepusty temat. Dział sprawdzają tylko dla dwóch przykładów z zadania (komputer → `help-desk@`, urlop → `kadry@`). Trafność na trudniejszych wiadomościach mierzy ewaluacja. Dodatkowo: próba prompt injection nie wysyła maila do `ceo@` ani z `Reply-To` napastnika, a pusta wiadomość daje 422 bez maila. Każdy test używa własnego adresu nadawcy i szuka swojego maila po `Reply-To`, więc testy nie czyszczą skrzynki Mailpit. Gdy compose nie działa, testy są pomijane (skip) z podpowiedzią `docker compose up -d`. Czas na CPU (i7-11850H): 52 s.
 
