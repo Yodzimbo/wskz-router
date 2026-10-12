@@ -1,0 +1,26 @@
+[project]
+name = "wskz-router"
+version = "0.1.0"
+description = "AI message router: FastAPI + pydantic-ai + Ollama, e-mail sent by an agent tool"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".claude"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+asyncio_mode = "auto"
+markers = [
+    "integration: requires the running docker compose stack",
+]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app"]
+strict = true

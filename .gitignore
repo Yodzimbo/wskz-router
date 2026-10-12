@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local configuration (values never committed; see .env.example)
+.env
+
+# Eval scratch output (final results in eval/results/ are committed)
+eval/results/*.tmp
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
