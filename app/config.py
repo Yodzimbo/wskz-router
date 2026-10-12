@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
     ollama_base_url: str = "http://ollama:11434"
-    ollama_model: str = "qwen2.5:3b"
+    ollama_model: str = "qwen3:4b-instruct"
     smtp_host: str = "mailpit"
     smtp_port: int = 1025
     mail_from: str = "router@example.com"
