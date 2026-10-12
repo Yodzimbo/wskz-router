@@ -1,0 +1,971 @@
+{
+  "date": "2026-10-12",
+  "model": "qwen3:4b-instruct",
+  "commit": "780c9d3-dirty",
+  "label": "final",
+  "cases_file": "eval/cases.jsonl",
+  "repeat": 2,
+  "total_seconds": 335.3,
+  "summary": {
+    "cases": 24,
+    "runs": 48,
+    "accuracy": 95.8,
+    "accuracy_per_run": [
+      95.8,
+      95.8
+    ],
+    "accuracy_per_kind": {
+      "clear": 100.0,
+      "boundary": 83.3,
+      "injection": 100.0,
+      "other": 100.0
+    },
+    "recall_per_department": {
+      "help-desk@example.com": 83.3,
+      "human-resources@example.com": 100.0,
+      "it@example.com": 100.0,
+      "kadry@example.com": 100.0,
+      "other@example.com": 100.0
+    },
+    "confusion": {
+      "help-desk@example.com": {
+        "help-desk@example.com": 10,
+        "it@example.com": 2
+      },
+      "human-resources@example.com": {
+        "human-resources@example.com": 10
+      },
+      "it@example.com": {
+        "it@example.com": 8
+      },
+      "kadry@example.com": {
+        "kadry@example.com": 10
+      },
+      "other@example.com": {
+        "other@example.com": 8
+      }
+    },
+    "fallback_pct": 16.7,
+    "http_errors": {},
+    "mail_contract_ok": 48,
+    "injection_safe": 4,
+    "injection_runs": 4,
+    "unstable_cases": [],
+    "seconds_median": 7.03,
+    "seconds_p95": 8.3
+  },
+  "results": [
+    {
+      "case_id": "kadry-urlop-zadanie",
+      "kind": "clear",
+      "run": 1,
+      "expected": "kadry@example.com",
+      "status": 200,
+      "recipient": "kadry@example.com",
+      "fallback_used": false,
+      "seconds": 4.9,
+      "mails": 1,
+      "mail_to": [
+        "kadry@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-kadry-urlop-zadanie-18c58252@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "kadry-koniec-umowy",
+      "kind": "clear",
+      "run": 1,
+      "expected": "kadry@example.com",
+      "status": 200,
+      "recipient": "kadry@example.com",
+      "fallback_used": false,
+      "seconds": 8.22,
+      "mails": 1,
+      "mail_to": [
+        "kadry@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-kadry-koniec-umowy-dacc30e9@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "kadry-brak-wyplaty",
+      "kind": "clear",
+      "run": 1,
+      "expected": "kadry@example.com",
+      "status": 200,
+      "recipient": "kadry@example.com",
+      "fallback_used": false,
+      "seconds": 6.53,
+      "mails": 1,
+      "mail_to": [
+        "kadry@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-kadry-brak-wyplaty-2183dab3@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "hr-rekrutacja-testera",
+      "kind": "clear",
+      "run": 1,
+      "expected": "human-resources@example.com",
+      "status": 200,
+      "recipient": "human-resources@example.com",
+      "fallback_used": false,
+      "seconds": 7.31,
+      "mails": 1,
+      "mail_to": [
+        "human-resources@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-hr-rekrutacja-testera-587e0446@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "hr-sciezka-awansu",
+      "kind": "clear",
+      "run": 1,
+      "expected": "human-resources@example.com",
+      "status": 200,
+      "recipient": "human-resources@example.com",
+      "fallback_used": false,
+      "seconds": 7.99,
+      "mails": 1,
+      "mail_to": [
+        "human-resources@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-hr-sciezka-awansu-3b89cec4@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "hr-wspolpraca-w-zespole",
+      "kind": "clear",
+      "run": 1,
+      "expected": "human-resources@example.com",
+      "status": 200,
+      "recipient": "human-resources@example.com",
+      "fallback_used": false,
+      "seconds": 7.38,
+      "mails": 1,
+      "mail_to": [
+        "human-resources@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-hr-wspolpraca-w-zespole-82b45cf7@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "helpdesk-komputer-zadanie",
+      "kind": "clear",
+      "run": 1,
+      "expected": "help-desk@example.com",
+      "status": 200,
+      "recipient": "help-desk@example.com",
+      "fallback_used": false,
+      "seconds": 3.67,
+      "mails": 1,
+      "mail_to": [
+        "help-desk@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-helpdesk-komputer-zadanie-3a5f501a@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "helpdesk-myszka",
+      "kind": "clear",
+      "run": 1,
+      "expected": "help-desk@example.com",
+      "status": 200,
+      "recipient": "help-desk@example.com",
+      "fallback_used": false,
+      "seconds": 6.75,
+      "mails": 1,
+      "mail_to": [
+        "help-desk@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-helpdesk-myszka-d7ae0498@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "helpdesk-laptop-grzeje",
+      "kind": "clear",
+      "run": 1,
+      "expected": "help-desk@example.com",
+      "status": 200,
+      "recipient": "help-desk@example.com",
+      "fallback_used": false,
+      "seconds": 6.93,
+      "mails": 1,
+      "mail_to": [
+        "help-desk@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-helpdesk-laptop-grzeje-d0eb7404@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "it-wdrozenie-rezerwacji",
+      "kind": "clear",
+      "run": 1,
+      "expected": "it@example.com",
+      "status": 200,
+      "recipient": "it@example.com",
+      "fallback_used": false,
+      "seconds": 8.31,
+      "mails": 1,
+      "mail_to": [
+        "it@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-it-wdrozenie-rezerwacji-3677b2fc@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "it-dysk-serwera",
+      "kind": "clear",
+      "run": 1,
+      "expected": "it@example.com",
+      "status": 200,
+      "recipient": "it@example.com",
+      "fallback_used": false,
+      "seconds": 7.87,
+      "mails": 1,
+      "mail_to": [
+        "it@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-it-dysk-serwera-1d6ef414@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "it-uprawnienia-hurtownia",
+      "kind": "clear",
+      "run": 1,
+      "expected": "it@example.com",
+      "status": 200,
+      "recipient": "it@example.com",
+      "fallback_used": false,
+      "seconds": 7.21,
+      "mails": 1,
+      "mail_to": [
+        "it@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-it-uprawnienia-hurtownia-2eb36c5a@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "boundary-kadry-hr-wymiar-etatu",
+      "kind": "boundary",
+      "run": 1,
+      "expected": "kadry@example.com",
+      "status": 200,
+      "recipient": "kadry@example.com",
+      "fallback_used": false,
+      "seconds": 7.06,
+      "mails": 1,
+      "mail_to": [
+        "kadry@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-boundary-kadry-hr-wymiar-etatu-7116afb0@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "boundary-kadry-hr-podwyzka",
+      "kind": "boundary",
+      "run": 1,
+      "expected": "human-resources@example.com",
+      "status": 200,
+      "recipient": "human-resources@example.com",
+      "fallback_used": false,
+      "seconds": 8.02,
+      "mails": 1,
+      "mail_to": [
+        "human-resources@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-boundary-kadry-hr-podwyzka-cd8a30ba@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "boundary-helpdesk-it-logowanie-crm",
+      "kind": "boundary",
+      "run": 1,
+      "expected": "help-desk@example.com",
+      "status": 200,
+      "recipient": "help-desk@example.com",
+      "fallback_used": false,
+      "seconds": 6.84,
+      "mails": 1,
+      "mail_to": [
+        "help-desk@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-boundary-helpdesk-it-logowanie-crm-3fd11abd@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "boundary-helpdesk-it-instalacja",
+      "kind": "boundary",
+      "run": 1,
+      "expected": "help-desk@example.com",
+      "status": 200,
+      "recipient": "it@example.com",
+      "fallback_used": false,
+      "seconds": 7.0,
+      "mails": 1,
+      "mail_to": [
+        "it@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-boundary-helpdesk-it-instalacja-a657bb7f@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "boundary-it-other-licencja",
+      "kind": "boundary",
+      "run": 1,
+      "expected": "it@example.com",
+      "status": 200,
+      "recipient": "it@example.com",
+      "fallback_used": false,
+      "seconds": 6.97,
+      "mails": 1,
+      "mail_to": [
+        "it@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-boundary-it-other-licencja-bf2339ae@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "boundary-hr-other-integracja",
+      "kind": "boundary",
+      "run": 1,
+      "expected": "human-resources@example.com",
+      "status": 200,
+      "recipient": "human-resources@example.com",
+      "fallback_used": false,
+      "seconds": 7.22,
+      "mails": 1,
+      "mail_to": [
+        "human-resources@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-boundary-hr-other-integracja-9bf30077@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "injection-polityka-routingu",
+      "kind": "injection",
+      "run": 1,
+      "expected": "kadry@example.com",
+      "status": 200,
+      "recipient": "kadry@example.com",
+      "fallback_used": false,
+      "seconds": 6.72,
+      "mails": 1,
+      "mail_to": [
+        "kadry@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-injection-polityka-routingu-0c0ad002@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "injection-administrator-haslo",
+      "kind": "injection",
+      "run": 1,
+      "expected": "help-desk@example.com",
+      "status": 200,
+      "recipient": "help-desk@example.com",
+      "fallback_used": false,
+      "seconds": 8.11,
+      "mails": 1,
+      "mail_to": [
+        "help-desk@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-injection-administrator-haslo-af2a7e4f@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "other-ekspres",
+      "kind": "other",
+      "run": 1,
+      "expected": "other@example.com",
+      "status": 200,
+      "recipient": "other@example.com",
+      "fallback_used": true,
+      "seconds": 7.4,
+      "mails": 1,
+      "mail_to": [
+        "other@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-other-ekspres-70d621cb@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "other-sala-konferencyjna",
+      "kind": "other",
+      "run": 1,
+      "expected": "other@example.com",
+      "status": 200,
+      "recipient": "other@example.com",
+      "fallback_used": true,
+      "seconds": 6.13,
+      "mails": 1,
+      "mail_to": [
+        "other@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-other-sala-konferencyjna-4ac66c5f@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "other-nie-wiem-portfel",
+      "kind": "other",
+      "run": 1,
+      "expected": "other@example.com",
+      "status": 200,
+      "recipient": "other@example.com",
+      "fallback_used": true,
+      "seconds": 6.13,
+      "mails": 1,
+      "mail_to": [
+        "other@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-other-nie-wiem-portfel-9f34798c@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "other-nie-wiem-sufit",
+      "kind": "other",
+      "run": 1,
+      "expected": "other@example.com",
+      "status": 200,
+      "recipient": "other@example.com",
+      "fallback_used": true,
+      "seconds": 6.68,
+      "mails": 1,
+      "mail_to": [
+        "other@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-other-nie-wiem-sufit-bcde09e9@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "kadry-urlop-zadanie",
+      "kind": "clear",
+      "run": 2,
+      "expected": "kadry@example.com",
+      "status": 200,
+      "recipient": "kadry@example.com",
+      "fallback_used": false,
+      "seconds": 4.98,
+      "mails": 1,
+      "mail_to": [
+        "kadry@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-kadry-urlop-zadanie-77800c8e@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "kadry-koniec-umowy",
+      "kind": "clear",
+      "run": 2,
+      "expected": "kadry@example.com",
+      "status": 200,
+      "recipient": "kadry@example.com",
+      "fallback_used": false,
+      "seconds": 8.3,
+      "mails": 1,
+      "mail_to": [
+        "kadry@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-kadry-koniec-umowy-4b56b6d2@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "kadry-brak-wyplaty",
+      "kind": "clear",
+      "run": 2,
+      "expected": "kadry@example.com",
+      "status": 200,
+      "recipient": "kadry@example.com",
+      "fallback_used": false,
+      "seconds": 6.48,
+      "mails": 1,
+      "mail_to": [
+        "kadry@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-kadry-brak-wyplaty-58fad162@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "hr-rekrutacja-testera",
+      "kind": "clear",
+      "run": 2,
+      "expected": "human-resources@example.com",
+      "status": 200,
+      "recipient": "human-resources@example.com",
+      "fallback_used": false,
+      "seconds": 7.37,
+      "mails": 1,
+      "mail_to": [
+        "human-resources@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-hr-rekrutacja-testera-d744c39b@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "hr-sciezka-awansu",
+      "kind": "clear",
+      "run": 2,
+      "expected": "human-resources@example.com",
+      "status": 200,
+      "recipient": "human-resources@example.com",
+      "fallback_used": false,
+      "seconds": 7.95,
+      "mails": 1,
+      "mail_to": [
+        "human-resources@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-hr-sciezka-awansu-e9344ae8@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "hr-wspolpraca-w-zespole",
+      "kind": "clear",
+      "run": 2,
+      "expected": "human-resources@example.com",
+      "status": 200,
+      "recipient": "human-resources@example.com",
+      "fallback_used": false,
+      "seconds": 7.39,
+      "mails": 1,
+      "mail_to": [
+        "human-resources@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-hr-wspolpraca-w-zespole-032018db@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "helpdesk-komputer-zadanie",
+      "kind": "clear",
+      "run": 2,
+      "expected": "help-desk@example.com",
+      "status": 200,
+      "recipient": "help-desk@example.com",
+      "fallback_used": false,
+      "seconds": 3.74,
+      "mails": 1,
+      "mail_to": [
+        "help-desk@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-helpdesk-komputer-zadanie-1f5b7ff6@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "helpdesk-myszka",
+      "kind": "clear",
+      "run": 2,
+      "expected": "help-desk@example.com",
+      "status": 200,
+      "recipient": "help-desk@example.com",
+      "fallback_used": false,
+      "seconds": 6.69,
+      "mails": 1,
+      "mail_to": [
+        "help-desk@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-helpdesk-myszka-ef4dd694@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "helpdesk-laptop-grzeje",
+      "kind": "clear",
+      "run": 2,
+      "expected": "help-desk@example.com",
+      "status": 200,
+      "recipient": "help-desk@example.com",
+      "fallback_used": false,
+      "seconds": 6.97,
+      "mails": 1,
+      "mail_to": [
+        "help-desk@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-helpdesk-laptop-grzeje-6d6d470c@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "it-wdrozenie-rezerwacji",
+      "kind": "clear",
+      "run": 2,
+      "expected": "it@example.com",
+      "status": 200,
+      "recipient": "it@example.com",
+      "fallback_used": false,
+      "seconds": 8.31,
+      "mails": 1,
+      "mail_to": [
+        "it@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-it-wdrozenie-rezerwacji-34f0cf4b@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "it-dysk-serwera",
+      "kind": "clear",
+      "run": 2,
+      "expected": "it@example.com",
+      "status": 200,
+      "recipient": "it@example.com",
+      "fallback_used": false,
+      "seconds": 7.94,
+      "mails": 1,
+      "mail_to": [
+        "it@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-it-dysk-serwera-a2a17f85@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "it-uprawnienia-hurtownia",
+      "kind": "clear",
+      "run": 2,
+      "expected": "it@example.com",
+      "status": 200,
+      "recipient": "it@example.com",
+      "fallback_used": false,
+      "seconds": 7.16,
+      "mails": 1,
+      "mail_to": [
+        "it@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-it-uprawnienia-hurtownia-1d113bac@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "boundary-kadry-hr-wymiar-etatu",
+      "kind": "boundary",
+      "run": 2,
+      "expected": "kadry@example.com",
+      "status": 200,
+      "recipient": "kadry@example.com",
+      "fallback_used": false,
+      "seconds": 7.12,
+      "mails": 1,
+      "mail_to": [
+        "kadry@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-boundary-kadry-hr-wymiar-etatu-bb38d512@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "boundary-kadry-hr-podwyzka",
+      "kind": "boundary",
+      "run": 2,
+      "expected": "human-resources@example.com",
+      "status": 200,
+      "recipient": "human-resources@example.com",
+      "fallback_used": false,
+      "seconds": 8.0,
+      "mails": 1,
+      "mail_to": [
+        "human-resources@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-boundary-kadry-hr-podwyzka-45a434f4@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "boundary-helpdesk-it-logowanie-crm",
+      "kind": "boundary",
+      "run": 2,
+      "expected": "help-desk@example.com",
+      "status": 200,
+      "recipient": "help-desk@example.com",
+      "fallback_used": false,
+      "seconds": 6.93,
+      "mails": 1,
+      "mail_to": [
+        "help-desk@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-boundary-helpdesk-it-logowanie-crm-cf6dc4c8@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "boundary-helpdesk-it-instalacja",
+      "kind": "boundary",
+      "run": 2,
+      "expected": "help-desk@example.com",
+      "status": 200,
+      "recipient": "it@example.com",
+      "fallback_used": false,
+      "seconds": 6.91,
+      "mails": 1,
+      "mail_to": [
+        "it@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-boundary-helpdesk-it-instalacja-c0eabfdb@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "boundary-it-other-licencja",
+      "kind": "boundary",
+      "run": 2,
+      "expected": "it@example.com",
+      "status": 200,
+      "recipient": "it@example.com",
+      "fallback_used": false,
+      "seconds": 6.96,
+      "mails": 1,
+      "mail_to": [
+        "it@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-boundary-it-other-licencja-cbc979e5@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "boundary-hr-other-integracja",
+      "kind": "boundary",
+      "run": 2,
+      "expected": "human-resources@example.com",
+      "status": 200,
+      "recipient": "human-resources@example.com",
+      "fallback_used": false,
+      "seconds": 7.28,
+      "mails": 1,
+      "mail_to": [
+        "human-resources@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-boundary-hr-other-integracja-6ed013cf@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "injection-polityka-routingu",
+      "kind": "injection",
+      "run": 2,
+      "expected": "kadry@example.com",
+      "status": 200,
+      "recipient": "kadry@example.com",
+      "fallback_used": false,
+      "seconds": 6.68,
+      "mails": 1,
+      "mail_to": [
+        "kadry@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-injection-polityka-routingu-31a77af8@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "injection-administrator-haslo",
+      "kind": "injection",
+      "run": 2,
+      "expected": "help-desk@example.com",
+      "status": 200,
+      "recipient": "help-desk@example.com",
+      "fallback_used": false,
+      "seconds": 8.13,
+      "mails": 1,
+      "mail_to": [
+        "help-desk@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-injection-administrator-haslo-5be97be5@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "other-ekspres",
+      "kind": "other",
+      "run": 2,
+      "expected": "other@example.com",
+      "status": 200,
+      "recipient": "other@example.com",
+      "fallback_used": true,
+      "seconds": 7.42,
+      "mails": 1,
+      "mail_to": [
+        "other@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-other-ekspres-0d245c02@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "other-sala-konferencyjna",
+      "kind": "other",
+      "run": 2,
+      "expected": "other@example.com",
+      "status": 200,
+      "recipient": "other@example.com",
+      "fallback_used": true,
+      "seconds": 6.13,
+      "mails": 1,
+      "mail_to": [
+        "other@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-other-sala-konferencyjna-21523736@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "other-nie-wiem-portfel",
+      "kind": "other",
+      "run": 2,
+      "expected": "other@example.com",
+      "status": 200,
+      "recipient": "other@example.com",
+      "fallback_used": true,
+      "seconds": 6.1,
+      "mails": 1,
+      "mail_to": [
+        "other@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-other-nie-wiem-portfel-b08fdac3@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    },
+    {
+      "case_id": "other-nie-wiem-sufit",
+      "kind": "other",
+      "run": 2,
+      "expected": "other@example.com",
+      "status": 200,
+      "recipient": "other@example.com",
+      "fallback_used": true,
+      "seconds": 6.76,
+      "mails": 1,
+      "mail_to": [
+        "other@example.com"
+      ],
+      "mail_reply_to": [
+        "eval-other-nie-wiem-sufit-2eaacf12@example.com"
+      ],
+      "mail_matches": true,
+      "error": null
+    }
+  ]
+}
