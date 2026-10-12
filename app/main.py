@@ -1,6 +1,11 @@
+import logging
+
 from fastapi import FastAPI
 
-from app.api import health
+from app.api import health, messages
+
+# Uvicorn configures only its own loggers; without this the routing decisions are not logged.
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s - %(message)s")
 
 app = FastAPI(
     title="wskz-router",
@@ -14,3 +19,4 @@ app = FastAPI(
     redoc_url=None,
 )
 app.include_router(health.router)
+app.include_router(messages.router)
