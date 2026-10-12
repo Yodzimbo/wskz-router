@@ -95,7 +95,25 @@ Skrót poniżej, szczegóły w [docs/decisions.md](docs/decisions.md).
 _Pozostałe decyzje: do uzupełnienia._
 
 ## Testy i ewaluacja
-_Do uzupełnienia (M4, M5)._
+Testy uruchamia się na hoście, w wirtualnym środowisku Pythona 3.12:
+
+```bash
+python3.12 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pytest tests/unit -q                           # ok. 2 s, bez Dockera
+.venv/bin/pytest tests/integration -m integration -q     # ok. 1 min, wymaga docker compose up -d
+```
+
+**Testy jednostkowe** (`tests/unit`, 55 testów) nie potrzebują Ollamy ani sieci: model zastępuje `FunctionModel` z pydantic-ai, który zwraca zaplanowane wywołania toola, a SMTP jest podmieniony. Prawdziwe zapytanie do modelu kończy się błędem (`ALLOW_MODEL_REQUESTS = False`). Sprawdzają kontrakt agenta:
+- mail wysyła wyłącznie tool `send_email` (sprawdzane też statycznie: `smtplib` tylko w `app/mail/`, funkcja wysyłająca importowana tylko przez tool), a gdy model odpowie tekstem zamiast toola, nic nie zostaje wysłane i API zwraca 502;
+- model widzi w toolu tylko dział (enum 5 adresów), temat i treść. Adres spoza listy albo dodatkowy argument `reply_to` jest odrzucany z prośbą o poprawkę, a `Reply-To` zawsze pochodzi z requestu;
+- treść wiadomości trafia do modelu tylko jako wiadomość użytkownika, nigdy do instrukcji systemowych;
+- lista działów w kodzie, prompcie i tabeli w tym README jest ta sama, fallback `other@` jest oznaczony w odpowiedzi i zalogowany;
+- walidacja requestu (422), mapowanie błędów (502, 504), timeout, `/health`, sanityzacja tematu maila.
+
+**Testy integracyjne** (`tests/integration`, 6 testów) wysyłają requesty do działającego API i sprawdzają maile przez API Mailpit: dokładnie jeden mail na request, adresat zgodny z odpowiedzią API i z listy działów, nagłówek `Reply-To` równy nadawcy, niepusty temat. Dział sprawdzają tylko dla dwóch przykładów z zadania (komputer → `help-desk@`, urlop → `kadry@`). Trafność na trudniejszych wiadomościach mierzy ewaluacja. Dodatkowo: próba prompt injection nie wysyła maila do `ceo@` ani z `Reply-To` napastnika, a pusta wiadomość daje 422 bez maila. Każdy test używa własnego adresu nadawcy i szuka swojego maila po `Reply-To`, więc testy nie czyszczą skrzynki Mailpit. Gdy compose nie działa, testy są pomijane (skip) z podpowiedzią `docker compose up -d`. Czas na CPU (i7-11850H): 52 s.
+
+Ewaluacja trafności: _do uzupełnienia (M5)._
 
 ## Ograniczenia
 - Inferencja na CPU: w `dod_check` (i7-11850H, 7 wiadomości) odpowiedź trwała 3,7–16,4 s, mediana 5,3 s. Najdłużej trwała próba prompt injection, bo model najpierw odmówił tekstem i wywołał tool dopiero po przypomnieniu. Na słabszym laptopie czasy będą dłuższe.
