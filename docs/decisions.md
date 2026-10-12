@@ -5,7 +5,7 @@ Każda decyzja: kontekst, decyzja, konsekwencje. Uzupełniane w kolejnych milest
 ## ADR-001: Język promptu i opisów toola
 - Kontekst: wiadomości i maile są po polsku, a mały model (4B) najlepiej trzyma się instrukcji i schematu toola w języku, na którym głównie go trenowano. Wiadomość ląduje u polskojęzycznych działów.
 - Decyzja: instrukcje agenta, opisy działów i docstring toola po angielsku; temat i treść maila model pisze po polsku (wprost w instrukcji). Wiadomość użytkownika trafia do modelu bez zmian, jako user prompt.
-- Konsekwencje: w pomiarze z ADR-002 ten zestaw dał 100% poprawnych działów na 12 polskich wiadomościach, a w M3 `dod_check` 7/7 (z próbą injection). Opisy działów są w jednym miejscu (`app/departments.py`), więc zmiana sformułowań to zmiana jednego pliku, sprawdzana pełnym evalem w M5.
+- Konsekwencje: w pomiarze z ADR-002 ten zestaw dał 100% poprawnych działów na 12 polskich wiadomościach, a w M3 `dod_check` 7/7 (z próbą injection). Opisy działów są w jednym miejscu (`app/departments.py`), więc zmiana sformułowań to zmiana jednego pliku; w ewaluacji M5 (24 nowe wiadomości) po doprecyzowaniu opisów help-desk, IT i other trafność wzrosła z 70,8% do 95,8% (jednoznaczne 100%, injection 4/4), szczegóły w README.
 
 ## ADR-002: Wybór modelu LLM
 - Kontekst: model ma niezawodnie wywoływać tool `send_email` z poprawnym działem (enum 5 adresów), rozumieć polskie wiadomości i odpowiadać w rozsądnym czasie na CPU przeciętnego laptopa. Wybór na podstawie pomiaru, nie opinii. Kryterium ustalone przed pomiarem: (1) ≥ 90% poprawnych działów i 100% wywołań toola w lepszym wariancie rejestracji toola, (2) p95 ≤ 30 s, (3) najmniejszy rozmiar pobrania. `qwen2.5:7b` tylko jako punkt odniesienia.

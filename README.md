@@ -67,11 +67,11 @@ POST /api/v1/messages {email, message}
 |---|---|
 | `kadry@example.com` | formalności: urlopy, umowy, wynagrodzenia, zaświadczenia |
 | `human-resources@example.com` | rekrutacja, rozwój, szkolenia, relacje w zespole |
-| `help-desk@example.com` | pomoc użytkownikowi: komputer, sprzęt, konto, hasło |
-| `it@example.com` | systemy, serwery, uprawnienia, wdrożenia, oprogramowanie |
-| `other@example.com` | wszystko inne albo gdy model nie jest pewien (fallback) |
+| `help-desk@example.com` | pierwsza linia pomocy dla jednego pracownika: jego komputer, laptop, peryferia, logowanie, hasło, poczta, oprogramowanie na jego urządzeniu |
+| `it@example.com` | systemy i infrastruktura firmy: serwery, sieci, bazy danych, wdrożenia, uprawnienia, licencje, oprogramowanie dla całej firmy |
+| `other@example.com` | wszystko, co nie pasuje do powyższych (np. sprawy biura, budynku, administracji), albo gdy model nie jest pewien (fallback) |
 
-Lista działów i ich opisy są zdefiniowane raz, w `app/departments.py`; instrukcje agenta i schemat toola są z niej składane.
+Lista działów i ich opisy są zdefiniowane raz, w `app/departments.py`: instrukcje agenta są składane z opisów, a schemat toola bierze z niej enum adresów. Opisy help-desk, IT i other zostały doprecyzowane na podstawie pomyłek w ewaluacji (niżej).
 
 | Plik | Rola |
 |---|---|
@@ -104,7 +104,7 @@ python3.12 -m venv .venv
 .venv/bin/pytest tests/integration -m integration -q     # ok. 1 min, wymaga docker compose up -d
 ```
 
-**Testy jednostkowe** (`tests/unit`, 55 testów) nie potrzebują Ollamy ani sieci: model zastępuje `FunctionModel` z pydantic-ai, który zwraca zaplanowane wywołania toola, a SMTP jest podmieniony. Prawdziwe zapytanie do modelu kończy się błędem (`ALLOW_MODEL_REQUESTS = False`). Sprawdzają kontrakt agenta:
+**Testy jednostkowe** (`tests/unit`, 60 testów) nie potrzebują Ollamy ani sieci: model zastępuje `FunctionModel` z pydantic-ai, który zwraca zaplanowane wywołania toola, a SMTP jest podmieniony. Prawdziwe zapytanie do modelu kończy się błędem (`ALLOW_MODEL_REQUESTS = False`). Sprawdzają kontrakt agenta:
 - mail wysyła wyłącznie tool `send_email` (sprawdzane też statycznie: `smtplib` tylko w `app/mail/`, funkcja wysyłająca importowana tylko przez tool), a gdy model odpowie tekstem zamiast toola, nic nie zostaje wysłane i API zwraca 502;
 - model widzi w toolu tylko dział (enum 5 adresów), temat i treść. Adres spoza listy albo dodatkowy argument `reply_to` jest odrzucany z prośbą o poprawkę, a `Reply-To` zawsze pochodzi z requestu;
 - treść wiadomości trafia do modelu tylko jako wiadomość użytkownika, nigdy do instrukcji systemowych;
@@ -113,7 +113,33 @@ python3.12 -m venv .venv
 
 **Testy integracyjne** (`tests/integration`, 6 testów) wysyłają requesty do działającego API i sprawdzają maile przez API Mailpit: dokładnie jeden mail na request, adresat zgodny z odpowiedzią API i z listy działów, nagłówek `Reply-To` równy nadawcy, niepusty temat. Dział sprawdzają tylko dla dwóch przykładów z zadania (komputer → `help-desk@`, urlop → `kadry@`). Trafność na trudniejszych wiadomościach mierzy ewaluacja. Dodatkowo: próba prompt injection nie wysyła maila do `ceo@` ani z `Reply-To` napastnika, a pusta wiadomość daje 422 bez maila. Każdy test używa własnego adresu nadawcy i szuka swojego maila po `Reply-To`, więc testy nie czyszczą skrzynki Mailpit. Gdy compose nie działa, testy są pomijane (skip) z podpowiedzią `docker compose up -d`. Czas na CPU (i7-11850H): 52 s.
 
-Ewaluacja trafności: _do uzupełnienia (M5)._
+### Ewaluacja
+Ewaluacja mierzy, jak często model wybiera właściwy dział. To nie jest test pass/fail: wynik zależy od modelu, nie tylko od kodu. Skrypt `eval/run_eval.py` wysyła 24 polskie wiadomości z `eval/cases.jsonl` do działającego API, a każdy mail znajduje w Mailpicie po unikalnym `Reply-To` i sprawdza go tak jak testy integracyjne. Wynik (JSON z każdą odpowiedzią) trafia do `eval/results/`.
+
+```bash
+docker compose up -d
+.venv/bin/python eval/run_eval.py                  # ok. 3 min na CPU (i7-11850H)
+.venv/bin/python eval/run_eval.py --repeat 2 --label final
+```
+
+Przypadki: 12 jednoznacznych (po 3 na kadry, HR, help-desk, IT, w tym oba przykłady z zadania), 6 granicznych (kadry/HR, help-desk/IT, IT/inne, HR/inne), 2 próby prompt injection i 4 sprawy „inne”, pisane różnie: formalnie, potocznie, z literówkami, bez polskich znaków, wielowątkowo. Poza dwoma przykładami z zadania nie powtarzają wiadomości z pomiaru wyboru modelu (ADR-002) ani z instrukcji agenta, co sprawdza test `tests/unit/test_eval_cases.py`.
+
+Wyniki z 2026-10-12, `qwen3:4b-instruct`, Ollama na CPU (i7-11850H):
+
+| Metryka | Przed strojeniem | Po strojeniu (2 powtórzenia) |
+|---|---|---|
+| Trafność ogólna | 70,8% (17/24) | 95,8% (46/48) |
+| Jednoznaczne | 91,7% (11/12) | 100% (24/24) |
+| Graniczne | 50,0% (3/6) | 83,3% (10/12) |
+| Prompt injection | 2/2 | 4/4 |
+| Inne | 25,0% (1/4) | 100% (8/8) |
+| Recall: kadry / HR / help-desk / IT / other | 100 / 100 / 50 / 75 / 25% | 100 / 100 / 83 / 100 / 100% |
+| Fallback (`fallback_used: true`) | 4,2% | 16,7% |
+| Mail zgodny z API (1 mail, `To` = `recipient`, `Reply-To` = nadawca) | 24/24 | 48/48 |
+| Błędy HTTP (502 / 504) | 0 | 0 |
+| Czas odpowiedzi: mediana / p95 | 7,1 s / 8,2 s | 7,0 s / 8,3 s |
+
+Przed strojeniem model kierował do IT awarie sprzętu i problemy z oprogramowaniem pojedynczego pracownika, a sprawy biurowe (zepsuty ekspres, rezerwacja sali, przeciek z sufitu) do help-desku albo HR, bo opis `other@` nie mówił, co do niego należy. Obie przyczyny to niejasne definicje działów, więc poprawione zostały tylko opisy w `app/departments.py`: help-desk to pomoc dla jednego pracownika i jego urządzenia, IT to systemy i infrastruktura firmy, a `other@` obejmuje sprawy biura i budynku. Nowe sformułowania (laptop, logowanie, licencje, sprawy biura i budynku) opisują kategorie, w których model się mylił, a nie cytują przypadków, ale wynik po strojeniu jest mierzony na tym samym zestawie, więc jest optymistyczny; niezależną kontrolą są scenariusze `dod_check` spoza tego zestawu. Jedyna pozostała pomyłka, prośba o instalację Pythona i Dockera bez uprawnień administratora (oczekiwany help-desk, model wybiera IT), jest naprawdę dwuznaczna, bo dotyczy zarówno komputera pracownika, jak i uprawnień. Oczekiwania dla przypadków granicznych: zmiana wymiaru etatu → kadry (zmiana umowy), niespełniona obietnica podwyżki → HR (rozwój i relacja z przełożonym, nie naliczanie płac), logowanie do CRM i instalacja programów na własnym laptopie → help-desk (problem jednego pracownika), licencja dla działu → IT, wyjazd integracyjny → HR (relacje w zespole). Przy `temperature=0` oba powtórzenia dały te same decyzje, a obie próby injection trafiły do działu z listy z `Reply-To` nadawcy.
 
 ## Ograniczenia
 - Inferencja na CPU: w `dod_check` (i7-11850H, 7 wiadomości) odpowiedź trwała 3,7–16,4 s, mediana 5,3 s. Najdłużej trwała próba prompt injection, bo model najpierw odmówił tekstem i wywołał tool dopiero po przypomnieniu. Na słabszym laptopie czasy będą dłuższe.
