@@ -1,11 +1,9 @@
 # wskz-router - AI router wiadomości
 
-> Status: **w budowie** (proof of concept, zadanie rekrutacyjne WSKZ).
-
-API przyjmuje wiadomość od użytkownika, agent LLM (Ollama, lokalnie) analizuje jej treść i sam, przez tool / function calling, wysyła e-mail do właściwego działu z nagłówkiem `Reply-To` ustawionym na adres nadawcy.
+Proof of concept (zadanie rekrutacyjne WSKZ). API przyjmuje wiadomość od użytkownika, agent LLM (Ollama, lokalnie) analizuje jej treść i sam, przez tool / function calling, wysyła e-mail do właściwego działu z nagłówkiem `Reply-To` ustawionym na adres nadawcy.
 
 ## Szybki start
-Wymagania: Docker z Docker Compose v2, ok. 8 GB RAM i 12 GB wolnego miejsca na dysku. Wystarczy CPU, GPU nie jest potrzebne. Wolne muszą być porty 8000, 8025 i 1025.
+Wymagania: Docker z Docker Compose v2 (`docker compose`; stary `docker-compose` v1 nie był testowany), ok. 8 GB RAM i 12 GB wolnego miejsca na dysku. Wystarczy CPU, GPU nie jest potrzebne. Wolne muszą być porty 8000, 8025 i 1025.
 
 ```bash
 git clone <adres-repo> wskz-router && cd wskz-router
@@ -13,7 +11,7 @@ docker compose up -d
 docker compose ps        # api, mailpit, ollama: healthy; ollama-init: Exited (0)
 ```
 
-Pierwszy start pobiera ok. 6,5 GB: obraz Ollamy oraz wagi modelu `qwen3:4b-instruct` (2,5 GB). Komenda wraca dopiero po pobraniu modelu, a w kilka sekund później API zgłasza gotowość. Czas pierwszego startu na maszynie deweloperskiej z szybkim łączem: **ok. 5 min** (zmierzone 4,5 min z mniejszym modelem `qwen2.5:3b`, nowy model jest większy o 0,6 GB). Czas zależy głównie od łącza: przy 100 Mb/s samo pobranie 6,5 GB to ok. 9–11 min. Postęp: `docker compose logs -f ollama-init`.
+Pierwszy start pobiera ok. 6,5 GB: obraz Ollamy oraz wagi modelu `qwen3:4b-instruct` (2,5 GB). Komenda wraca dopiero po pobraniu modelu, a w kilka sekund później API zgłasza gotowość. Czas pierwszego startu zależy głównie od łącza. Zmierzone na świeżym klonie (i7-11850H, szybkie łącze, ok. 70 MB/s): pobranie modelu do pustego wolumenu i start całości to **39 s**, a API zgłasza gotowość 2 s później. W tym pomiarze obraz Ollamy (ok. 4 GB) był już w cache Dockera; wcześniejszy pomiar z pobraniem obrazu (z mniejszym modelem `qwen2.5:3b`) dał 4,5 min. Przy 100 Mb/s samo pobranie 6,5 GB to ok. 9–11 min. Postęp: `docker compose logs -f ollama-init`.
 
 Kolejne starty trwają ok. 10–15 s do gotowości API, bo model zostaje w wolumenie `ollama-models` i nie jest pobierany ponownie. `docker compose down` zatrzymuje środowisko. `docker compose down -v` dodatkowo kasuje wolumen z wagami, więc następny start znów pobierze model.
 
@@ -37,13 +35,31 @@ curl -X POST http://localhost:8000/api/v1/messages \
   -d '{"email": "jan.nowak@example.com", "message": "Nie działa mi komputer"}'
 ```
 
-Odpowiedź przychodzi po wysłaniu maila (na CPU laptopa zwykle 4–9 s):
+Odpowiedź przychodzi po wysłaniu maila (na CPU laptopa zwykle 4–10 s):
 
 ```json
 {"recipient":"help-desk@example.com","reply_to":"jan.nowak@example.com","subject":"Problem z komputerem","fallback_used":false,"duration_ms":8935}
 ```
 
-Mail jest widoczny w Mailpicie: http://localhost:8025 (adresat `help-desk@example.com`, nagłówek `Reply-To: jan.nowak@example.com`, w treści streszczenie od modelu i oryginalna wiadomość). Drugi przykład z zadania, `"Chciałbym zgłosić urlop na jutro"`, trafia do `kadry@example.com`.
+Mail jest widoczny w Mailpicie: http://localhost:8025 (adresat `help-desk@example.com`, nagłówek `Reply-To: jan.nowak@example.com`, w treści streszczenie od modelu i oryginalna wiadomość).
+
+Inne wiadomości do wklejenia w pole `message` (odpowiedzi zmierzone na działającym środowisku, CPU i7-11850H; ostatnie dwie nie występują w ewaluacji ani w instrukcjach agenta):
+
+| `message` | `recipient` | `subject` od modelu | Czas |
+|---|---|---|---|
+| `Chciałbym zgłosić urlop na jutro` (przykład z zadania) | `kadry@example.com` | Zgłoszenie urlopu na jutro | 6,6 s |
+| `Od rana cały dział sprzedaży nie może połączyć się przez VPN z serwerem plików` | `it@example.com` | Problem z połączeniem przez VPN dla działu sprzedaży | 7,6 s |
+| `Chciałabym zapisać się na szkolenie z zaawansowanego Excela, czy firma organizuje takie kursy?` | `human-resources@example.com` | Zapisanie się na szkolenie z zaawansowanego Excela | 9,6 s |
+
+Pierwsze zapytanie po starcie bywa wolniejsze (powyższy przykład z komputerem: 14,5 s), bo Ollama ładuje model do pamięci.
+
+Na Windows w PowerShell `curl` to alias `Invoke-WebRequest`, a cytowanie JSON w `curl.exe` jest kłopotliwe. Prościej przez `Invoke-RestMethod`, z treścią wysłaną jako UTF-8 (inaczej Windows PowerShell 5.1 zepsuje polskie znaki):
+
+```powershell
+$body = @{ email = "jan.nowak@example.com"; message = "Nie działa mi komputer" } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/messages `
+  -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($body))
+```
 
 | Kod | Znaczenie |
 |---|---|
@@ -153,8 +169,8 @@ Skrót poniżej, szczegóły w [docs/decisions.md](docs/decisions.md).
 - **Fallback `other@example.com` to decyzja modelu, oznaczona `fallback_used: true` i zalogowana.** Gdy model w ogóle nie wywoła toola, API zwraca 502 i nic nie wysyła, zamiast wysyłać „na ślepo”. Niedostępna Ollama daje szybkie 503 (ADR-005).
 - **Jedna linia logu JSON na request i `X-Request-ID` od odpowiedzi do maila**, bez nowych zależności (ADR-007).
 - **Instrukcje po angielsku, temat i treść maila po polsku** (ADR-001).
-
-_Pozostałe decyzje: do uzupełnienia._
+- **Python + FastAPI + pydantic-ai zamiast PHP.** pydantic-ai daje typowany tool z enumem działów, walidację argumentów z automatycznym ponowieniem i `TestModel` / `FunctionModel` do testów bez modelu; FastAPI generuje Swaggera z tych samych modeli pydantic. Jeden system typów (pydantic) obsługuje walidację requestu, schemat toola i dokumentację API. Odrzucone: langchain (więcej warstw niż potrzeba dla jednego toola) i warianty PHP z sugestii zadania (ADR-008).
+- **Synchroniczne API: 200 dopiero po wysłaniu maila.** Klient od razu wie, do którego działu trafiła wiadomość i czy w ogóle wyszła; bez kolejki odpowiedź 202 ukrywałaby błędy (ADR-005). Wersja z kolejką jest w sekcji [Co zrobiłbym w produkcji](#co-zrobiłbym-w-produkcji).
 
 ## Testy i ewaluacja
 Testy uruchamia się na hoście, w wirtualnym środowisku Pythona 3.12:
@@ -202,12 +218,26 @@ Wyniki z 2026-10-12, `qwen3:4b-instruct`, Ollama na CPU (i7-11850H):
 | Błędy HTTP (502 / 504) | 0 | 0 |
 | Czas odpowiedzi: mediana / p95 | 7,1 s / 8,2 s | 7,0 s / 8,3 s |
 
-Przed strojeniem model kierował do IT awarie sprzętu i problemy z oprogramowaniem pojedynczego pracownika, a sprawy biurowe (zepsuty ekspres, rezerwacja sali, przeciek z sufitu) do help-desku albo HR, bo opis `other@` nie mówił, co do niego należy. Obie przyczyny to niejasne definicje działów, więc poprawione zostały tylko opisy w `app/departments.py`: help-desk to pomoc dla jednego pracownika i jego urządzenia, IT to systemy i infrastruktura firmy, a `other@` obejmuje sprawy biura i budynku. Nowe sformułowania (laptop, logowanie, licencje, sprawy biura i budynku) opisują kategorie, w których model się mylił, a nie cytują przypadków, ale wynik po strojeniu jest mierzony na tym samym zestawie, więc jest optymistyczny; niezależną kontrolą są scenariusze `dod_check` spoza tego zestawu. Jedyna pozostała pomyłka, prośba o instalację Pythona i Dockera bez uprawnień administratora (oczekiwany help-desk, model wybiera IT), jest naprawdę dwuznaczna, bo dotyczy zarówno komputera pracownika, jak i uprawnień. Oczekiwania dla przypadków granicznych: zmiana wymiaru etatu → kadry (zmiana umowy), niespełniona obietnica podwyżki → HR (rozwój i relacja z przełożonym, nie naliczanie płac), logowanie do CRM i instalacja programów na własnym laptopie → help-desk (problem jednego pracownika), licencja dla działu → IT, wyjazd integracyjny → HR (relacje w zespole). Przy `temperature=0` oba powtórzenia dały te same decyzje, a obie próby injection trafiły do działu z listy z `Reply-To` nadawcy.
+Przed strojeniem model kierował do IT awarie sprzętu i problemy z oprogramowaniem pojedynczego pracownika, a sprawy biurowe (zepsuty ekspres, rezerwacja sali, przeciek z sufitu) do help-desku albo HR, bo opis `other@` nie mówił, co do niego należy. Obie przyczyny to niejasne definicje działów, więc poprawione zostały tylko opisy w `app/departments.py`: help-desk to pomoc dla jednego pracownika i jego urządzenia, IT to systemy i infrastruktura firmy, a `other@` obejmuje sprawy biura i budynku. Nowe sformułowania (laptop, logowanie, licencje, sprawy biura i budynku) opisują kategorie, w których model się mylił, a nie cytują przypadków, ale wynik po strojeniu jest mierzony na tym samym zestawie, więc jest optymistyczny; niezależną kontrolą są ręczne scenariusze kontrolne na działającym środowisku (wiadomości spoza tego zestawu, w tym próba injection) i przykłady z sekcji [Przykładowe zapytanie](#przykładowe-zapytanie-curl). Jedyna pozostała pomyłka, prośba o instalację Pythona i Dockera bez uprawnień administratora (oczekiwany help-desk, model wybiera IT), jest naprawdę dwuznaczna, bo dotyczy zarówno komputera pracownika, jak i uprawnień. Oczekiwania dla przypadków granicznych: zmiana wymiaru etatu → kadry (zmiana umowy), niespełniona obietnica podwyżki → HR (rozwój i relacja z przełożonym, nie naliczanie płac), logowanie do CRM i instalacja programów na własnym laptopie → help-desk (problem jednego pracownika), licencja dla działu → IT, wyjazd integracyjny → HR (relacje w zespole). Przy `temperature=0` oba powtórzenia dały te same decyzje, a obie próby injection trafiły do działu z listy z `Reply-To` nadawcy.
 
 ## Ograniczenia
-- Inferencja na CPU: w `dod_check` (i7-11850H, 7 wiadomości) odpowiedź trwała 3,7–16,4 s, mediana 5,3 s. Najdłużej trwała próba prompt injection, bo model najpierw odmówił tekstem i wywołał tool dopiero po przypomnieniu. Na słabszym laptopie czasy będą dłuższe.
+- Inferencja na CPU: w ręcznych scenariuszach kontrolnych (i7-11850H, 7 wiadomości spoza zestawu ewaluacji) odpowiedź trwała 3,7–16,4 s, mediana 5,3 s. Najdłużej trwała próba prompt injection, bo model najpierw odmówił tekstem i wywołał tool dopiero po przypomnieniu. Na słabszym laptopie czasy będą dłuższe.
 - Ollama przetwarza requesty po kolei, więc kilka równoległych zapytań czeka na siebie i może przekroczyć `AGENT_TIMEOUT_S` (504).
 - Odpowiedź jest synchroniczna (200 po wysyłce), bez kolejki. Timeout przypadający dokładnie w trakcie wysyłki SMTP nie cofnie już wysłanego maila (ADR-005).
+- Brak trwałej kolejki i ponowień wysyłki: gdy SMTP jest niedostępny, API zwraca 502 i wiadomość trzeba wysłać jeszcze raz.
+- Brak uwierzytelniania i limitu requestów: każdy, kto ma dostęp do portu 8000, może wysyłać maile do działów (w PoC tylko do Mailpita). Panel Mailpita (8025) też nasłuchuje na wszystkich interfejsach, więc przechwycone maile z treścią wiadomości widzi każdy w tej samej sieci.
+- Nieprzewidziany wyjątek kończy się odpowiedzią 500 bez nagłówka `X-Request-ID` i bez linii decyzji w logu. Endpoint mapuje wszystkie znane błędy (502 / 503 / 504), a globalny handler to rzecz na produkcję (ADR-007).
+- Ewaluacja i testy integracyjne sprawdzają skrzynkę Mailpita w uproszczony sposób. Przy odpowiedzi innej niż 200 ewaluacja zagląda do skrzynki tylko raz, od razu, więc nie wykryłaby maila wysłanego z opóźnieniem (np. 504 w trakcie wysyłki SMTP). Test injection szuka maila do `ceo@` tylko na pierwszej stronie listy Mailpita. To drugie wystarcza, bo Mailpit zwraca najpierw najnowsze maile.
+- Mały model (4B) myli się w sprawach na granicy dwóch działów: 83% trafności na przypadkach granicznych w ewaluacji, a wynik po strojeniu jest optymistyczny (sekcja [Ewaluacja](#ewaluacja)).
+
+## Co zrobiłbym w produkcji
+- **Kolejka i worker:** API zapisuje zgłoszenie i od razu zwraca 202 z identyfikatorem i adresem do sprawdzenia statusu, a worker uruchamia agenta. Idempotencja po `X-Request-ID`, żeby ponowiony request nie wysłał drugiego maila.
+- **Niezawodna wysyłka:** ponowienia SMTP z backoffem, kolejka błędów (DLQ) z alertem zamiast 502 dla klienta.
+- **Jakość routingu:** informacja zwrotna od działów („to nie do nas”) jako nowe przypadki ewaluacji, ewaluacja w CI przy każdej zmianie promptu, opisów działów albo modelu, z progiem trafności blokującym wdrożenie. Wersjonowanie promptu i modelu, zapisywane w logu decyzji.
+- **Obserwowalność:** metryki (czas, trafność fallbacku, liczba ponowień, błędy 5xx), tracing requestu przez agenta i SMTP, logi uvicorna w JSON, globalny handler 500 z `X-Request-ID`.
+- **Bezpieczeństwo:** uwierzytelnianie klientów API i limit requestów na klienta.
+- **Dane osobowe:** zasady retencji maili i logów, maskowanie danych w treści przed zapisem tam, gdzie treść nie jest potrzebna.
+- **Wydajność:** GPU albo większy model za flagą konfiguracji, wybierany tym samym pomiarem co w ADR-002.
 
 ## Treść zadania
 [docs/zadanie.md](docs/zadanie.md)
