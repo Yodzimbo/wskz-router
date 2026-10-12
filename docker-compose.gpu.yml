@@ -1,0 +1,12 @@
+# Optional NVIDIA GPU for Ollama (default stack runs on CPU).
+# Requires the NVIDIA driver and nvidia-container-toolkit on the host.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d   (or: make up-gpu)
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
