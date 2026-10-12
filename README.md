@@ -13,7 +13,7 @@ docker compose up -d
 docker compose ps        # api, mailpit, ollama: healthy; ollama-init: Exited (0)
 ```
 
-Pierwszy start pobiera ok. 6 GB: obraz Ollamy oraz wagi modelu `qwen2.5:3b`. Komenda wraca dopiero po pobraniu modelu, a w kilka sekund później API zgłasza gotowość. Zmierzony czas pierwszego startu na maszynie deweloperskiej z szybkim łączem: **ok. 4,5 min**. Czas zależy głównie od łącza: przy 100 Mb/s samo pobranie 6 GB to ok. 8–10 min. Postęp: `docker compose logs -f ollama-init`.
+Pierwszy start pobiera ok. 6,5 GB: obraz Ollamy oraz wagi modelu `qwen3:4b-instruct` (2,5 GB). Komenda wraca dopiero po pobraniu modelu, a w kilka sekund później API zgłasza gotowość. Czas pierwszego startu na maszynie deweloperskiej z szybkim łączem: **ok. 5 min** (zmierzone 4,5 min z mniejszym modelem `qwen2.5:3b`, nowy model jest większy o 0,6 GB). Czas zależy głównie od łącza: przy 100 Mb/s samo pobranie 6,5 GB to ok. 9–11 min. Postęp: `docker compose logs -f ollama-init`.
 
 Kolejne starty trwają ok. 10–15 s do gotowości API, bo model zostaje w wolumenie `ollama-models` i nie jest pobierany ponownie. `docker compose down` zatrzymuje środowisko. `docker compose down -v` dodatkowo kasuje wolumen z wagami, więc następny start znów pobierze model.
 
@@ -38,6 +38,7 @@ _Do uzupełnienia (M3)._
 Skrót poniżej, szczegóły w [docs/decisions.md](docs/decisions.md).
 
 - **Mailpit zamiast MailHoga.** Jest aktywnie rozwijany i ma REST API, przez które testy sprawdzają odbiorcę i `Reply-To` (ADR-003).
+- **Model `qwen3:4b-instruct`, wybrany pomiarem.** Spośród czterech modeli z obsługą tooli tylko on, przy rozmiarze poniżej 3 GB, wybrał właściwy dział we wszystkich 12 polskich wiadomościach testowych, z p95 26,5 s na CPU laptopa (ADR-002).
 - **Model pobiera osobny kontener `ollama-init`.** API startuje dopiero po jego sukcesie, a ponowny start nie pobiera modelu drugi raz (ADR-006).
 
 _Pozostałe decyzje: do uzupełnienia._
