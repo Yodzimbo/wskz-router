@@ -1,21 +1,26 @@
 import asyncio
+import json
+import logging
+import re
 from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from pydantic_ai.exceptions import ModelAPIError
+from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from app.agent.router_agent import RouterAgent, build_router_agent, get_router_agent
 from app.config import Settings, get_settings
 from app.departments import Department
+from app.logging import JsonFormatter
 from app.main import app
 from tests.unit.conftest import FakeSMTP
 
 SETTINGS = Settings(agent_retries=1, agent_timeout_s=5)
 URL = "/api/v1/messages"
 REQUEST = {"email": "jan.nowak@example.com", "message": "Nie działa mi komputer"}
+DECISION_LOGGER = "app.api.messages"
 
 
 def calls(department: str) -> FunctionModel:
@@ -99,17 +104,22 @@ def test_no_tool_call_returns_502(
     assert fake_smtp.sent == []
 
 
-def test_model_unavailable_returns_502(
-    agent: RouterAgent, client: TestClient, fake_smtp: type[FakeSMTP]
+@pytest.mark.parametrize(
+    "failure",
+    [ModelAPIError("ollama", "connection refused"), ModelHTTPError(404, "qwen3:4b-instruct")],
+)
+def test_model_unavailable_returns_503(
+    agent: RouterAgent, client: TestClient, fake_smtp: type[FakeSMTP], failure: ModelAPIError
 ) -> None:
     def down(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
-        raise ModelAPIError("ollama", "connection refused")
+        raise failure
 
     with agent.override(model=FunctionModel(down)):
         response = client.post(URL, json=REQUEST)
 
-    assert response.status_code == 502
+    assert response.status_code == 503
     assert response.json()["error"] == "model_unavailable"
+    assert fake_smtp.sent == []
 
 
 def test_smtp_down_returns_502(
@@ -146,6 +156,115 @@ def test_openapi_documents_examples_and_errors(client: TestClient) -> None:
     spec = client.get("/api/v1/openapi.json").json()
     operation = spec["paths"][URL]["post"]
 
-    assert set(operation["responses"]) >= {"200", "422", "502", "504"}
+    assert set(operation["responses"]) >= {"200", "422", "502", "503", "504"}
     examples = spec["components"]["schemas"]["MessageRequest"]["examples"]
     assert examples[0]["message"] == "Nie działa mi komputer"
+
+
+def decisions(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [r for r in caplog.records if r.name == DECISION_LOGGER]
+
+
+def test_decision_log_has_fields_and_no_content(
+    agent: RouterAgent,
+    client: TestClient,
+    fake_smtp: type[FakeSMTP],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger=DECISION_LOGGER)
+    with agent.override(model=calls(Department.HELP_DESK)):
+        response = client.post(URL, json=REQUEST)
+
+    [record] = decisions(caplog)
+    line = JsonFormatter().format(record)
+    entry = json.loads(line)
+    assert entry["request_id"] == response.headers["X-Request-ID"]
+    assert entry["outcome"] == "sent"
+    assert entry["status"] == 200
+    assert entry["recipient"] == Department.HELP_DESK.value
+    assert entry["fallback_used"] is False
+    assert entry["model_requests"] == 1
+    assert entry["duration_ms"] >= 0
+    assert entry["smtp_ms"] >= 0
+    assert entry["message_length"] == len(REQUEST["message"])
+    assert entry["sender_domain"] == "example.com"
+    for secret in (REQUEST["message"], "jan.nowak"):
+        assert secret not in caplog.text
+        assert secret not in line
+
+
+def test_fallback_is_logged(
+    agent: RouterAgent,
+    client: TestClient,
+    fake_smtp: type[FakeSMTP],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger=DECISION_LOGGER)
+    with agent.override(model=calls(Department.OTHER)):
+        client.post(URL, json={**REQUEST, "message": "Gdzie mogę zostawić rower?"})
+
+    [record] = decisions(caplog)
+    assert record.fallback_used is True
+    assert record.recipient == Department.OTHER.value
+    assert "rower" not in caplog.text
+
+
+def test_error_is_logged_with_code(
+    agent: RouterAgent,
+    client: TestClient,
+    fake_smtp: type[FakeSMTP],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def down(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        raise ModelAPIError("ollama", "connection refused")
+
+    caplog.set_level(logging.INFO, logger=DECISION_LOGGER)
+    with agent.override(model=FunctionModel(down)):
+        client.post(URL, json=REQUEST)
+
+    [record] = decisions(caplog)
+    assert record.outcome == "model_unavailable"
+    assert record.status == 503
+    assert record.recipient is None
+    assert record.levelname == "WARNING"
+
+
+def test_validation_error_is_not_logged_as_decision(
+    agent: RouterAgent, client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger=DECISION_LOGGER)
+    response = client.post(URL, json={"email": "zly", "message": "x"})
+
+    assert response.status_code == 422
+    assert re.fullmatch("[0-9a-f]{32}", response.headers["X-Request-ID"])
+    assert decisions(caplog) == []
+
+
+def test_valid_request_id_is_echoed_to_response_mail_and_log(
+    agent: RouterAgent,
+    client: TestClient,
+    fake_smtp: type[FakeSMTP],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger=DECISION_LOGGER)
+    with agent.override(model=calls(Department.HELP_DESK)):
+        response = client.post(URL, json=REQUEST, headers={"X-Request-ID": "abc-123"})
+
+    assert response.headers["X-Request-ID"] == "abc-123"
+    assert fake_smtp.sent[0]["X-Request-ID"] == "abc-123"
+    assert fake_smtp.sent[0]["Reply-To"] == REQUEST["email"]
+    [record] = decisions(caplog)
+    assert record.request_id == "abc-123"
+
+
+@pytest.mark.parametrize("incoming", ["a\r\nBcc: x@example.com", "x" * 65, "a b", ""])
+def test_invalid_request_id_is_replaced(
+    agent: RouterAgent, client: TestClient, fake_smtp: type[FakeSMTP], incoming: str
+) -> None:
+    with agent.override(model=calls(Department.HELP_DESK)):
+        response = client.post(URL, json=REQUEST, headers={"X-Request-ID": incoming})
+
+    request_id = response.headers["X-Request-ID"]
+    assert request_id != incoming
+    assert re.fullmatch("[0-9a-f]{32}", request_id)
+    assert fake_smtp.sent[0]["X-Request-ID"] == request_id

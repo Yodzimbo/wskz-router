@@ -19,12 +19,16 @@ def normalize_subject(subject: str) -> str:
     return " ".join(subject.split())[:MAX_SUBJECT_LENGTH]
 
 
-def build_message(*, to: str, subject: str, body: str, reply_to: str, sender: str) -> EmailMessage:
+def build_message(
+    *, to: str, subject: str, body: str, reply_to: str, sender: str, request_id: str
+) -> EmailMessage:
     message = EmailMessage()  # default policy: rejects CR/LF in header values
     message["From"] = sender
     message["To"] = to
     message["Reply-To"] = reply_to
     message["Subject"] = normalize_subject(subject)
+    # Same id as the API response and the decision log line.
+    message["X-Request-ID"] = request_id
     message.set_content(body)
     return message
 
@@ -36,9 +40,16 @@ def _deliver(message: EmailMessage, settings: Settings) -> None:
         smtp.send_message(message)
 
 
-async def send_mail(*, to: str, subject: str, body: str, reply_to: str, settings: Settings) -> None:
+async def send_mail(
+    *, to: str, subject: str, body: str, reply_to: str, request_id: str, settings: Settings
+) -> None:
     message = build_message(
-        to=to, subject=subject, body=body, reply_to=reply_to, sender=settings.mail_from
+        to=to,
+        subject=subject,
+        body=body,
+        reply_to=reply_to,
+        sender=settings.mail_from,
+        request_id=request_id,
     )
     try:
         # smtplib is blocking; a thread keeps the event loop free for other requests.

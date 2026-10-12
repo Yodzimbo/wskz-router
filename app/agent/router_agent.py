@@ -1,7 +1,6 @@
 """Routing agent: a local Ollama model whose only way to finish a run is calling send_email."""
 
 import asyncio
-import logging
 import time
 from dataclasses import dataclass
 from functools import lru_cache
@@ -14,8 +13,6 @@ from pydantic_ai.settings import ModelSettings
 from app.agent.tools import RoutedEmail, RouterDeps, send_email
 from app.config import Settings, get_settings
 from app.departments import DEPARTMENT_SCOPES, FALLBACK_DEPARTMENT
-
-logger = logging.getLogger(__name__)
 
 RouterAgent = Agent[RouterDeps, RoutedEmail]
 
@@ -38,6 +35,7 @@ class RoutingOutcome:
     email: RoutedEmail
     fallback_used: bool
     duration_ms: int
+    model_requests: int
 
 
 def build_router_agent(settings: Settings) -> RouterAgent:
@@ -62,14 +60,16 @@ def get_router_agent() -> RouterAgent:
 
 
 async def route_message(
-    agent: RouterAgent, *, sender_email: str, message: str, settings: Settings
+    agent: RouterAgent, *, sender_email: str, message: str, request_id: str, settings: Settings
 ) -> RoutingOutcome:
     """Run the agent; returns after the e-mail was sent, raises if the model never called the tool.
 
     Errors propagate: UnexpectedModelBehavior / UsageLimitExceeded (no valid tool call),
     ModelAPIError (Ollama down), MailDeliveryError (SMTP), TimeoutError (AGENT_TIMEOUT_S).
     """
-    deps = RouterDeps(sender_email=sender_email, message=message, settings=settings)
+    deps = RouterDeps(
+        sender_email=sender_email, message=message, request_id=request_id, settings=settings
+    )
     started = time.perf_counter()
     async with asyncio.timeout(settings.agent_timeout_s):
         result = await agent.run(
@@ -78,16 +78,10 @@ async def route_message(
             # 1 request + retries, plus one spare; the retry budget is the real limit.
             usage_limits=UsageLimits(request_limit=settings.agent_retries + 2),
         )
-    outcome = RoutingOutcome(
+    # Logged by the endpoint, which also knows the HTTP status of failed runs.
+    return RoutingOutcome(
         email=result.output,
         fallback_used=result.output.department is FALLBACK_DEPARTMENT,
         duration_ms=round((time.perf_counter() - started) * 1000),
+        model_requests=result.usage.requests,
     )
-    logger.info(
-        "routed recipient=%s fallback=%s duration_ms=%d requests=%d",
-        outcome.email.department.value,
-        outcome.fallback_used,
-        outcome.duration_ms,
-        result.usage.requests,
-    )
-    return outcome

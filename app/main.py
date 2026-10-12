@@ -1,11 +1,16 @@
-import logging
+import re
+from collections.abc import Awaitable, Callable
+from uuid import uuid4
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 
 from app.api import health, messages
+from app.logging import configure_logging
 
-# Uvicorn configures only its own loggers; without this the routing decisions are not logged.
-logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s - %(message)s")
+# A client-supplied id is echoed into the response and the e-mail headers, so only safe tokens.
+REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._-]{1,64}")
+
+configure_logging()
 
 app = FastAPI(
     title="wskz-router",
@@ -20,3 +25,16 @@ app = FastAPI(
 )
 app.include_router(health.router)
 app.include_router(messages.router)
+
+
+@app.middleware("http")
+async def assign_request_id(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Correlates the response, the decision log line and the e-mail (`X-Request-ID`)."""
+    incoming = request.headers.get("X-Request-ID", "")
+    request_id = incoming if REQUEST_ID_PATTERN.fullmatch(incoming) else uuid4().hex
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response

@@ -6,6 +6,7 @@ from app.mail.sender import MailDeliveryError, send_mail
 from tests.unit.conftest import FakeSMTP
 
 SETTINGS = Settings(smtp_host="smtp.test", smtp_port=2525, mail_from="router@example.com")
+REQUEST_ID = "abc-123"
 
 
 async def test_message_headers(fake_smtp: type[FakeSMTP]) -> None:
@@ -14,6 +15,7 @@ async def test_message_headers(fake_smtp: type[FakeSMTP]) -> None:
         subject="Awaria komputera",
         body="Treść",
         reply_to="jan.nowak@example.com",
+        request_id=REQUEST_ID,
         settings=SETTINGS,
     )
 
@@ -23,6 +25,7 @@ async def test_message_headers(fake_smtp: type[FakeSMTP]) -> None:
     assert message["From"] == "router@example.com"
     assert message["Reply-To"] == "jan.nowak@example.com"
     assert message["Subject"] == "Awaria komputera"
+    assert message["X-Request-ID"] == REQUEST_ID
     assert message.get_content().strip() == "Treść"
 
 
@@ -32,6 +35,7 @@ async def test_subject_crlf_is_flattened(fake_smtp: type[FakeSMTP]) -> None:
         subject="a\r\nBcc: x@example.com\n  b",
         body="x",
         reply_to="jan.nowak@example.com",
+        request_id=REQUEST_ID,
         settings=SETTINGS,
     )
 
@@ -43,7 +47,12 @@ async def test_subject_crlf_is_flattened(fake_smtp: type[FakeSMTP]) -> None:
 
 async def test_long_subject_is_truncated(fake_smtp: type[FakeSMTP]) -> None:
     await send_mail(
-        to="d@example.com", subject="x" * 500, body="x", reply_to="a@example.com", settings=SETTINGS
+        to="d@example.com",
+        subject="x" * 500,
+        body="x",
+        reply_to="a@example.com",
+        request_id=REQUEST_ID,
+        settings=SETTINGS,
     )
 
     assert len(fake_smtp.sent[0]["Subject"]) == sender.MAX_SUBJECT_LENGTH
@@ -59,7 +68,12 @@ async def test_smtp_error_raises_mail_delivery_error(
 
     with pytest.raises(MailDeliveryError):
         await send_mail(
-            to="d@example.com", subject="s", body="b", reply_to="a@example.com", settings=SETTINGS
+            to="d@example.com",
+            subject="s",
+            body="b",
+            reply_to="a@example.com",
+            request_id=REQUEST_ID,
+            settings=SETTINGS,
         )
 
     assert fake_smtp.sent == []

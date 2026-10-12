@@ -4,6 +4,7 @@ The model chooses only department, subject and body (INV2); the recipient addres
 from the enum, Reply-To from the request (INV3).
 """
 
+import time
 from dataclasses import dataclass
 
 from pydantic_ai import ModelRetry, RunContext
@@ -19,6 +20,7 @@ class RouterDeps:
 
     sender_email: str
     message: str
+    request_id: str
     settings: Settings
 
 
@@ -26,6 +28,7 @@ class RouterDeps:
 class RoutedEmail:
     department: Department
     subject: str
+    smtp_ms: int
 
 
 def compose_body(summary: str, deps: RouterDeps) -> str:
@@ -49,11 +52,14 @@ async def send_email(
     subject = normalize_subject(subject)
     if not subject or not body.strip():
         raise ModelRetry("subject and body must not be empty")
+    started = time.perf_counter()
     await send_mail(
         to=department.value,
         subject=subject,
         body=compose_body(body, ctx.deps),
         reply_to=ctx.deps.sender_email,
+        request_id=ctx.deps.request_id,
         settings=ctx.deps.settings,
     )
-    return RoutedEmail(department=department, subject=subject)
+    smtp_ms = round((time.perf_counter() - started) * 1000)
+    return RoutedEmail(department=department, subject=subject, smtp_ms=smtp_ms)
