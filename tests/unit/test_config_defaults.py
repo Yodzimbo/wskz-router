@@ -18,3 +18,19 @@ def test_default_model_is_consistent() -> None:
     assert len(compose_defaults) == 2  # ollama-init pulls it, api checks it in /health
     assert len(env_defaults) == 1
     assert {*compose_defaults, *env_defaults} == {settings_default}
+
+
+def test_api_env_defaults_match_settings() -> None:
+    # `${VAR:-x}` in the api service must equal the Settings default, so running the app
+    # outside compose (tests, uvicorn on the host) behaves like the container.
+    compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    api_service = compose.split("\n  api:\n", 1)[1].split("\nvolumes:", 1)[0]
+    defaults = re.findall(r"\$\{([A-Z_]+):-([^}]*)\}", api_service)
+
+    assert {name for name, _ in defaults} >= {"OLLAMA_MODEL", "AGENT_TIMEOUT_S", "AGENT_RETRIES"}
+    for name, raw in defaults:
+        field = name.lower()
+        assert field in Settings.model_fields, name
+        assert getattr(Settings(**{field: raw}), field) == Settings.model_fields[field].default, (
+            name
+        )

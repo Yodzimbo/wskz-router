@@ -57,6 +57,7 @@ services:
       SMTP_PORT: "1025"
       MAIL_FROM: ${MAIL_FROM:-router@example.com}
       AGENT_TIMEOUT_S: ${AGENT_TIMEOUT_S:-60}
+      AGENT_RETRIES: ${AGENT_RETRIES:-3}
     depends_on:
       ollama-init:
         condition: service_completed_successfully
